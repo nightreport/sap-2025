@@ -1,0 +1,16 @@
+Ime varijable,Opis
+Country name,Ime zemlje.
+Regional indicator,Regija u kojoj se nalazi pojedina zemlja.
+Ladder score,"Osjećaj sreće prema Cantrilovoj ljestvici. Ispitanici trebaju ocijeniti zadovoljstvo vlastitim životom na skali od 0 do 10, gdje najbolji život kojeg mogu zamisliti ima najvišu vrijednost, a nula predstavlja najgori. Vrijednost varijable je prosjek reprezentativnog uzorka pojedine zemlje. (Izvor: Gallup World Poll)"
+GDP per capita,Bruto domaći proizvod po stanovniku prema paritetu kupovne moći (engl. purchasing power parity) izraženog u američkim dolarima. (Izvor: World Bank/World Development Indicators)
+Social support,Prosječna vrijednost odgovora ispitanika pojedine zemlje na da/ne pitanje “Imate li članove obitelji ili prijatelje na koje možete računati u nevolji?” (Izvor: Gallup World Poll)
+Healthy life expectancy,Očekivani broj godina života koji će prosječna osoba poživjeti u potpunom zdravlju (mjereno od rodenja). (Izvor: World Health Organization/Global Health Observatory)
+Freedom to make life choices,Prosječna vrijednost odgovora ispitanika pojedine zemlje na da/ne pitanje “Jeste li zadovoljni sa slobodom koju imate kod donošenja vlastitih životnih odluka?” (Izvor: Gallup World Poll)
+Generosity,Rezidual regresije prosječnog odgovora na pitanje “Jeste li tijekom prošlog mjeseca donirali novac u dobrotvorne svrhe?” na vrijednost BDP-a po stanovniku. (Izvor: Gallup World Poll)
+Perceptions of corruption,Prosječna vrijednost odgovora ispitanika pojedine zemlje na da/ne pitanja “Je li korupcija raširena u državnoj upravi?” i “Je li korupcija raširena u poduzećima?” (Izvor: Gallup World Poll)
+Alcohol consumption Both Sexes (L/year),Konzumirana ukupna količina čistog alkohola u jednoj godini prema WHO-u.
+Alcohol consumption Male (L/year),Konzumirana ukupna količina čistog alkohola u jednoj godini prema WHO-u.
+Alcohol consumption Female (L/year),Konzumirana ukupna količina čistog alkohola u jednoj godini prema WHO-u.
+Crime rate Crime Index,Broj prijavljenih zločina (bilo koje vrste) na 100000 stanovnika.
+Healthcare Legatum Prosperity Index Health Score,Indeks mjeri koliko su stanovnici zemlje zdravi i koliko su im pristupačne usluge potrebne za održavanje dobrog zdravlja.
+Gini Coefficient - World Bank,"Estimirani Ginijev koeficijent kojim se mjeri nejednakost dohotka u pojedinoj zemlji. Izražen je kao postotak - vrijednost 0 označava potpunu jednakost, a 100 potpunu nejednakost."

@@ -1,0 +1,419 @@
+---
+title: "SAP - projekt"
+subtitle: "World happiness report"
+author: "Tamara Ćorić, Ana Marić, Gregor Mihaljević, Petar Kuruc"
+output: pdf_document
+date: "2026-01-17"
+---
+
+```{r}
+library(dplyr)
+```
+
+## Uvod
+
+## Opis problema
+
+World Happiness Report je publikacija Mreže rješenja za održivi razvoj Ujedinjenih naroda koja sadrži podatke o osjećaju sreće pojedinih nacija na skali od 0 do 10. Cilj je razumjeti kako čimbenici poput regije, BDP-a po stanovniku, životnog vijeka, socijalne podrške i slično utječu na iskazanu sreću te usporediti izvještaje iz 2023. i 2025. godine. Ova analiza omogućuje bolji uvid u područja koja uvelike doprinose osjećaju sreće stanovnika neke države kako bi se razumjele regionalne razlike i identificirali ključni prediktori kvalitete života u suvremenom društvu.
+
+## Deskriptivna analiza
+
+Ručno smo spojili podatke u tablicama za 2023. i 2025. godinu radi bržeg uparivanja istih država sa različitim imenima u dvije tablice. 10 država se pojavljuje samo u podacima za 2025. godinu (Azerbaijan, Belize, Eswatini, Kuwait, Lesotho, Libya, Oman, Somalia, Trinidad and Tobago, Yemen), pa su one ručno maknute iz skupa podataka.
+
+```{r}
+whr_data = read.csv(file='WHR_2023_2025.csv')
+```
+
+Deskriptivna statistika:
+
+```{r}
+summary(whr_data)
+```
+
+Vidimo da pojedine države (ukljućujući i one koje se pojavljuju samo u podacima za 2025. godinu) imaju nedostajuće podatke za pojedine značajke. To treba uzeti u obzir kod analize koja zahtijeva korištenje značajki koje nisu ocjena sreće.
+
+## 1. Je li razina sreće u publikaciji za 2025. veća ili manja u usporedbi s istraživanjem provedenim godinu ranije?
+
+
+Cilj ovog dijela analize je ispitati postoji li statistički značajna razlika u prosječnoj razini iskazane sreće država između World Happiness Reporta iz 2023. i 2025. godine. Budući da se radi o istim državama promatranima u dvije vremenske točke, primijenjen je upareni t-test.
+
+Postavljamo sljedeće hipoteze:
+
+$$\begin{aligned}
+H_0 &: \text{Ne postoji razlika u prosječnoj razini sreće država između 2023. i 2025. godine.} \\
+H_1 &: \text{Postoji razlika u prosječnoj razini sreće država između 2023. i 2025. godine.}
+\end{aligned}$$
+Testiranje se provodi na razini značajnosti $\alpha = 0.05$.
+
+Izvještaj za 2025. godinu sadrži isključivo podatke o razini sreće, dok izvještaj za 2023. godinu sadrži dodatne socioekonomske varijable. U ovom istraživačkom pitanju koriste se isključivo podatci o razini sreće.
+
+```{r}
+whr_data = read.csv("WHR_2023_2025.csv", sep = ",")
+
+happiness <- whr_data[, c("Country", "Ladder.score", "Happiness.score")]
+colnames(happiness) <- c("country", "happiness_2023", "happiness_2025")
+
+happiness <- na.omit(happiness)
+```
+
+U analizu su uključene samo države za koje su dostupni podatci o razini sreće u obje promatrane godine, čime se osigurava ispravno uparivanje opažanja.
+
+```{r}
+summary(happiness$happiness_2023)
+summary(happiness$happiness_2025)
+```
+Deskriptivne mjere pokazuju da je prosječna razina iskazane sreće u 2025. godini neznatno viša nego u 2023. godini. Medijan i kvartili također upućuju na blagi pomak distribucije prema višim vrijednostima.
+
+```{r}
+boxplot(happiness$happiness_2023,
+        happiness$happiness_2025,
+        names = c("2023", "2025"),
+        main = "Distribucija razine sreće po godinama",
+        ylab = "Razina sreće")
+```
+Distribucije razine sreće u obje godine imaju sličan raspon i oblik. Prisutni su pojedinačni izdvojeni podatci, no bez izraženih asimetrija ili ekstremnih odstupanja. Iz deskriptivne analize nije moguće zaključiti postoji li statistički značajna razlika, zbog čega se provodi inferencijalna analiza.
+
+```{r}
+diff <- happiness$happiness_2025 - happiness$happiness_2023
+```
+
+```{r}
+hist(diff,
+     main = "Histogram razlika razine sreće (2025 - 2023)",
+     xlab = "Razlika razine sreće")
+
+qqnorm(diff, main = "Q-Q dijagram razlika razine sreće")
+qqline(diff, col = "steelblue", lwd = 2)
+```
+Normalnost razlika procijenjena je vizualno pomoću histograma i Q–Q dijagrama. Kako većina opažanja prati teorijsku normalnu razdiobu bez izraženih odstupanja, pretpostavka normalnosti smatra se zadovoljenom. Upareni t-test je robustan na manja odstupanja od normalnosti kod većeg broja opažanja.
+
+S obzirom na uparenu strukturu podataka i zadovoljene pretpostavke, provodimo upareni t-test.
+
+```{r}
+t.test(happiness$happiness_2025,
+       happiness$happiness_2023,
+       paired = TRUE,
+       alternative = "two.sided")
+```
+Dobivena p-vrijednost manja je od razine značajnosti $\alpha = 0.05$ pa odbacujemo nul-hipotezu i zaključujemo da postoji statistički značajna razlika u prosječnoj razini iskazane sreće država između 2023. i 2025. godine.
+
+Iako je razlika statistički značajna, njezina apsolutna veličina je mala u odnosu na ljestvicu mjerenja. Promjena od približno 0.07 bodova na skali od 0 do 10 upućuje na to da se radi o suptilnoj promjeni u prosječnoj razini sreće, koja nema izraženo praktično značenje na razini pojedinca.
+
+## 2. Možemo li temeljem drugih dostupnih varijabli predvidjeti razinu sreće neke nacije? Koja je od njih najbolji prediktor razine sreće?
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+```
+
+Za pitanje "Možemo li temeljem drugih dostupnih varijabli predvidjeti razinu sreće neke nacije?" koristit ćemo višestruku linearnu regresiju.
+
+Za model odabiremo samo numeričke varijable koje ćemo koristiti u regresijama, a umjesto izbacivanja NA vrijednosti, što bi smanjilo veličinu skupa podataka i moglo uvesti pristranost, zamjenjujemo ih s medijanima.
+
+```{r}
+
+whr_data2 <- read.csv("WHR_2023.csv")
+
+
+colnames(whr_data2) <- c("Country", "Region", "LadderScore", "GDP_per_capita", 
+                        "Social_support", "Healthy_life_expectancy", 
+                        "Freedom_choices", "Generosity", "Corruption_perception",
+                        "Alcohol_consumption", "Crime_index", "Healthcare_index", 
+                        "Gini_coefficient")
+
+summary(whr_data2)
+
+numeric_vars <- whr_data2 %>% 
+  select(LadderScore, GDP_per_capita, Social_support, Healthy_life_expectancy, 
+         Freedom_choices, Generosity, Corruption_perception, 
+         Crime_index, Healthcare_index, Gini_coefficient)
+
+# medijani umjesto NA
+model_data <- numeric_vars %>%
+  mutate(across(
+    .cols = everything(),
+    .fns  = ~ ifelse(is.na(.), median(., na.rm = TRUE), .)
+  ))
+```
+
+Radimo Spearmanovu korelacijsku matricu. Spearman koristi rangove i stoga je otporniji na outliere i ne pretpostavlja linearnost u originalnim vrijednostima koje nisu skalirane.
+
+```{r}
+cor_matrix <- cor(model_data, method = "spearman")
+
+corrplot(cor_matrix, 
+         method = "color", 
+         type = "upper", 
+         order = "hclust", 
+         addCoef.col = "black", 
+         tl.col = "black", 
+         tl.srt = 45, 
+         title = "Matrica korelacije varijabli sreće",
+         mar = c(0,0,1,0),
+         number.cex = 0.7)
+```
+
+Iz matrice je vidljivo da `GDP_per_capita` i `Social_support` imaju najsnažnije pozitivne korelacije sa srećom, dok `Corruption_perception` i `Gini_coefficient` imaju najveću negativnu korelaciju.
+
+Radimo model višestruke linearne regresije, uključujemo sve dostupne numeričke varijable kako bismo vidjeli njihov zajednički utjecaj na varijablu `LadderScore`. Cilj nam je dobiti koeficijent determinacije ($R^2$) koji će nam reći koliki postotak varijance sreće možemo objasniti ovim modelom. Također radimo i VIF za svaku varijablu kako bi provjerili multikolinearnost.
+
+```{r}
+fit_full <- lm(LadderScore ~ GDP_per_capita + Social_support + 
+               Healthy_life_expectancy + Freedom_choices + Generosity + 
+               Corruption_perception + Crime_index + Healthcare_index + 
+               Gini_coefficient, data = model_data)
+
+summary(fit_full)
+
+library(car)
+vif(fit_full)
+```
+
+Rezultati punog modela pokazuje koeficijent determinacije Adjusted R-squared = 0.8355, što je dobar rezultat, ali za Healthcare_index i Crime_index dobivamo jako veliku multikolinearnost s ostalim varijablama (Variance Inflation Factor \>40), što nam govori da model ne mora biti pouzdan.
+
+$$\mathrm{VIF}_j = \frac{1}{1 - R_j^2}$$ gdje je $R_j^2$ koeficijent determinacije dobiven regresijom varijable $X_j$ na sve ostale nezavisne varijable u modelu.
+
+Za drugi model izbacujemo varijablu Crime_index kako bismo probali smanjiti ostale VIF-ove.
+
+```{r}
+fit_reduced <- lm(LadderScore ~ GDP_per_capita + Social_support + 
+                  Healthy_life_expectancy + Freedom_choices + Generosity + 
+                  Corruption_perception + Healthcare_index + 
+                  Gini_coefficient, data = model_data)
+
+summary(fit_reduced)
+
+library(car)
+vif(fit_reduced)
+```
+
+Vidimo da su sad sve VIF vrijednosti manje od 4 te nam to govori da je ovaj model puno pouzdaniji i dobivamo Adjusted R-squared = 0.8192.
+
+Nastavljamo raditi grafove na temelju drugog modela.
+
+```{r}
+model_data$predicted <- predict(fit_reduced)
+model_data$residuals <- residuals(fit_reduced)
+sigma_val <- summary(fit_reduced)$sigma
+
+ggplot(model_data, aes(x = predicted, y = LadderScore)) +
+  geom_point(aes(color = abs(residuals) > sigma_val), alpha = 0.6, size = 2) +
+  scale_color_manual(values = c("darkgreen", "red"), 
+                     labels = c("Unutar 1 SD", "Odstupanje (>1 SD)")) +
+  geom_abline(intercept = 0, slope = 1, color = "blue", linetype = "dashed", size = 1) +
+  labs(title = "Kvaliteta predviđanja: Stvarno vs. Predviđeno",
+       x = "Predviđena razina sreće",
+       y = "Stvarna razina sreće",
+       color = "Odstupanje") +
+  theme_minimal()
+```
+
+Na gornjem grafu vidimo za predikcije i kolika je greška u odnosu na prave vrijednosti. Kvalitetu modela provjeravamo analizom reziduala.
+
+```{r}
+ggplot(model_data, aes(x = predicted, y = residuals)) +
+  geom_hline(yintercept = 0, color = "black", size = 1) +
+  geom_point(color = "steelblue", alpha = 0.5) +
+  geom_smooth(method = "loess", color = "red", se = FALSE) +
+  labs(title = "Analiza reziduala",
+       x = "Predviđene vrijednosti",
+       y = "Reziduali (Greška)") +
+  theme_light()
+```
+
+Vidimo da se reziduali nalaze oko 0 što nam govori da je model dobar.
+
+Da izračunamo koja varijabla najviše utječe na razinu sreće uspoređujemo Bete, radimo posebno za model koji nije skaliran sa svim numeričkim varijablama te za model u kojem smo skalirali sve vrijednosti i izbacili Crime_index zbog multikolinearnosti.
+
+```{r}
+coef_df <- as.data.frame(summary(fit_full)$coefficients[-1, ])
+coef_df$Variable <- rownames(coef_df)
+
+ggplot(coef_df, aes(x = reorder(Variable, Estimate), y = Estimate)) +
+  geom_bar(stat = "identity", fill = "orange", color = "darkorange") +
+  coord_flip() +
+  labs(title = "Utjecaj varijabli na ocjenu sreće (1. model)",
+       x = "Varijabla",
+       y = "koeficijent Beta") +
+  theme_minimal()
+```
+
+```{r}
+
+model_data_scaled <- as.data.frame(scale(model_data %>% select(-predicted, -residuals)))
+
+
+fit_scaled <- lm(LadderScore ~ GDP_per_capita + Social_support + 
+                 Healthy_life_expectancy + Freedom_choices + Generosity + 
+                 Corruption_perception + Crime_index + Healthcare_index + 
+                 Gini_coefficient, data = model_data_scaled)
+
+summary(fit_scaled)
+```
+
+```{r}
+# Skaliranje
+model_data_scaled <- as.data.frame(scale(model_data %>% select(-predicted, -residuals)))
+
+
+fit_scaled_reduced <- lm(LadderScore ~ GDP_per_capita + Social_support + 
+                         Healthy_life_expectancy + Freedom_choices + Generosity + 
+                         Corruption_perception + Healthcare_index + 
+                         Gini_coefficient, data = model_data_scaled)
+
+
+coef_scaled_reduced <- as.data.frame(summary(fit_scaled_reduced)$coefficients[-1, ])
+coef_scaled_reduced$Variable <- rownames(coef_scaled_reduced)
+
+
+ggplot(coef_scaled_reduced, aes(x = reorder(Variable, Estimate), y = Estimate)) +
+  geom_bar(stat = "identity", fill = "orange", color = "darkorange") +
+  coord_flip() +
+  labs(title = "Utjecaj varijabli na ocjenu sreće (2. model)",
+       x = "Varijabla",
+       y = "koeficijent Beta") +
+  theme_minimal()
+
+```
+
+Vidimo velike razlike između Beta koeficijenata u 1. i 2. grafu, no radi toga što je 2. model skaliran i nema veliku multikolinearnost, njegove rezultate smatramo relevantnijima, vidimo da su najveći faktori koji utječu na sreću Social support, Freedom choices i GDP, a najveći negativni utjecaj ima Corruption perception.
+
+## 3. Postoje li razlike u iskazanoj sreći medu različitim regijama?
+Prvo ćemo postaviti hipotete:
+$$
+H_0: \mu_1 = \mu_2 = \mu_3 = \mu_4 = \mu_5 \\
+H_1: \mu_i \neq \mu_j \quad \text{za barem jedan par } (i, j)
+$$
+Odlučili smo koristiti samo podatke iz 2025.
+```{r}
+whr_3=whr_data[, c("Country", "Regional.indicator", "Happiness.score")]
+```
+
+Obzirom imamo velik broj regija od kojih neke imaju mali broj uzoaraka spojit ćemo ih kako bismo mogli ispitati podatke jednofaktorskom ANOVA-om.
+
+```{r}
+whr_3$grouped.region[whr_3$Regional.indicator == "East Asia" | 
+                     whr_3$Regional.indicator == "Southeast Asia" | 
+                     whr_3$Regional.indicator == "South Asia"] = "Asia"
+
+whr_3$grouped.region[whr_3$Regional.indicator == "Latin America and Caribbean" | 
+                     whr_3$Regional.indicator == "North America and ANZ"] = "Americas and ANZ"
+
+whr_3$grouped.region[whr_3$Regional.indicator == "Central and Eastern Europe" |
+                     whr_3$Regional.indicator == "Western Europe"] = "Europe"
+
+whr_3$grouped.region[whr_3$Regional.indicator == "Commonwealth of Independent States" |
+                     whr_3$Regional.indicator == "Middle East and North Africa"] = "ME, NA and CIS"
+
+
+whr_3$grouped.region[whr_3$Regional.indicator == "Sub-Saharan Africa"] = "Sub-Saharan Africa"
+```
+Prije pokretanja ANOVA-e ćemo vizualizirati podatke.
+```{r}
+ggplot(whr_3, aes(x = grouped.region, y = Happiness.score, fill = grouped.region)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_point(position = position_jitter(width = 0.2), alpha = 0.5) +
+  labs(title = "Razina sreće po grupiranoj regiji",
+       x = "Grupa regija",
+       y = "Razina sreće") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+Jedna od pretpostavki za testiranje ANOVA-om jest normalnost reziduala, pa trebamo i to provjeriti, no prije konvertiramo groupirane regije.
+```{r}
+whr_3$grouped.region <- as.factor(whr_3$grouped.region)
+print(whr_3$grouped.region)
+```
+```{r}
+library(car)
+model <- aov(Happiness.score ~ grouped.region, data = whr_3)
+shapiro_whr3 <- shapiro.test(residuals(model))
+cat("Test normalnosti:p = ", shapiro_whr3$p.value, "\n")
+```
+Dobivamo jako malu p-vrijednost što znači da uzorci zadovoljavaju uvjet normalnosti reziduala.
+```{r}
+anova_result <- aov(Happiness.score ~ grouped.region, data = whr_3)
+summary(anova_result)
+```
+Iz ovako male p-vrijednosti odbacujemo nul hipotezu i zaključujemo da postoje statistički značajne razlike u razinama sreće između regionalnih grupa, odnosno da barem jedna grupa ima drukciju srednju vrijednost razine sreće od ostalih.
+
+## 4. Je li promjena razine sreće (poboljšanje/pogoršanje) između 2023. i 2025. godine nezavisna od regionalne pripadnosti zemalja?
+
+```{r}
+whr_4=whr_data[, c("Country", "Regional.indicator", "Ladder.score", "Happiness.score")]
+sum(!complete.cases(whr_4))
+```
+
+Vidimo da nemamo nedostajućih vrijednosti u podacima koji su nam potrebni, pa nastavljamo s analizom.
+
+Računamo promjenu sreće (2025-2023) i kategoriziramo ju kao poboljšanje ili pogoršanje
+
+```{r}
+whr_4$Happiness.change=whr_4$Happiness.score-whr_4$Ladder.score
+whr_4$Change.category=ifelse(whr_4$Happiness.change>0, "Poboljsanje", "Pogorsanje")
+head(whr_4)
+```
+
+```{r}
+contingency_table = table(whr_4$Regional.indicator, whr_4$Change.category)
+added_margins_table=addmargins(contingency_table)
+print(added_margins_table)
+```
+
+Pretpostavka testa je da očekivana frekvencija pojedinog razreda mora biti veća ili jednaka 5 (chisq.test() pretpostavlja da je ovaj uvjet zadovoljen stoga je prije provođenja testa potrebno to provjeriti).
+
+```{r}
+for (col_names in colnames(added_margins_table)){
+  for (row_names in rownames(added_margins_table)){
+    if (!(row_names == 'Sum' | col_names == 'Sum') ){
+      cat('Očekivane frekvencije za razred ',col_names,'-',row_names,': ',(added_margins_table[row_names,'Sum'] * added_margins_table['Sum',col_names]) / added_margins_table['Sum','Sum'],'\n')
+    }
+  }
+}
+```
+
+Vidimo da uvijet nije zadovoljen, pa ćemo spojiti regije.
+
+```{r}
+whr_4$grouped.region[whr_4$Regional.indicator == "East Asia" | 
+                     whr_4$Regional.indicator == "Southeast Asia" | 
+                     whr_4$Regional.indicator == "South Asia"] = "Asia"
+
+whr_4$grouped.region[whr_4$Regional.indicator == "Latin America and Caribbean" | 
+                     whr_4$Regional.indicator == "North America and ANZ"] = "Americas and ANZ"
+
+whr_4$grouped.region[whr_4$Regional.indicator == "Central and Eastern Europe" |
+                     whr_4$Regional.indicator == "Western Europe"] = "Europe"
+
+whr_4$grouped.region[whr_4$Regional.indicator == "Commonwealth of Independent States" |
+                     whr_4$Regional.indicator == "Middle East and North Africa"] = "ME, NA and CIS"
+
+
+whr_4$grouped.region[whr_4$Regional.indicator == "Sub-Saharan Africa"] = "Sub-Saharan Africa"
+```
+
+```{r}
+contingency_table = table(whr_4$grouped.region, whr_4$Change.category)
+added_margins_table=addmargins(contingency_table)
+print(added_margins_table)
+```
+
+```{r}
+for (col_names in colnames(added_margins_table)){
+  for (row_names in rownames(added_margins_table)){
+    if (!(row_names == 'Sum' | col_names == 'Sum') ){
+      cat('Očekivane frekvencije za razred ',col_names,'-',row_names,': ',(added_margins_table[row_names,'Sum'] * added_margins_table['Sum',col_names]) / added_margins_table['Sum','Sum'],'\n')
+    }
+  }
+}
+```
+
+Sve očekivane frekvencije su veće od 5. Možemo nastaviti sa $\chi^2$ testom.
+
+```{r}
+chisq.test(contingency_table, correct=F)
+```
+
+Na temelju Pearsonovog hi-kvadrat testa nezavisnosti, s p-vrijednošću od 0.042 (p \< 0.05), odbacujemo nultu hipotezu na razini značajnosti od 5%. Postoji statistički značajna povezanost između regionalne pripadnosti i promjene sreće.
